@@ -1,52 +1,189 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-  <meta charset="utf-8">
-  <title>Joel</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <title>Joel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <style type="text/css">
-    html,
-    body {
-      background: pink;
-      margin: 0;
-      padding: 0;
-      font-family: sans-serif;
-    }
+    <style type="text/css">
+        html,
+        body {
+            background: pink;
+            margin: 0;
+            padding: 0;
+            font-family: sans-serif;
+        }
 
-    #captcha-container {
-      background: white;
-      width: 390px;
-      height: 300px;
-    }
+        #captcha-container {
+            background: #f0f0f0;
+            width: 390px;
+            height: 300px;
+            overflow: hidden;
+        }
 
-    /* Your style here... */
-  </style>
+        /* CSS Variables for color */
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #f44336;
+            --text-color: #fff;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        #instructions {
+            text-align: center;
+            font-size: 18px;
+            padding: 10px;
+            font-weight: bold;
+        }
+    </style>
 </head>
 
 <body>
-  <div id="captcha-container">
-    <!-- Add your CAPTCHA here: -->
-    Hello world!
+    <div id="captcha-container">
+        <div id="instructions">Click the numbers in order.</div>
+        <canvas id="canvas"></canvas>
+    </div>
 
-    <!-- We've added a sample button. Feel free to remove it: -->
-    <button id="solve">
-      Solve!
-    </button>
-  </div>
 
-  <script type="text/javascript">
-    (function(window, document){
-      // This is how you tell the parent window that the CAPTCHA was successful.
-      function captchaSuccess() {
-        window.top.postMessage("success", '*');
-      }
 
-      // Your CAPTCHA code goes here, we've added a simple example below:
-      document.getElementById('solve')
-           .addEventListener('click', () => captchaSuccess());
+    <script type="text/javascript">
+        (function (window, document) {
+            // This is how you tell the parent window that the CAPTCHA was successful.
+            function captchaSuccess() {
+                window.top.postMessage("success", '*');
+            }
 
-    })(window, document);
-  </script>
+            // Show multiple numbers in a random order randomly on the canvas, with at least spacing between them.
+            CANVAS_WIDTH = 380;
+            CANVAS_HEIGHT = 250;
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = CANVAS_WIDTH;
+            canvas.height = CANVAS_HEIGHT;
+            const numbers = [];
+            const numberCount = 7; // Number of numbers to show
+            const numberSpacing = 30; // Minimum spacing between numbers
+            const numberSize = 20; // Size of the numbers
+            const numberFont = `${numberSize}px Arial`;
+            ctx.font = numberFont;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const numberPositions = [];
+            const lastClickedNumber = -1;
+            let isInFailureMode = false;
+            let hasSucceededOnce = false;
+
+            function captchaFailure() {
+               // Render on the canvas failure. Click to retry.
+                ctx.fillStyle = 'red';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                ctx.fillStyle = 'black';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Try Again', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+                isInFailureMode = true;
+                canvas.addEventListener('click', function () {
+                    // Reset the captcha by scrambling new positions
+                    // scrambleNewNumberPositions();
+                    // displayNumbers();
+                }, { once: true }); // Ensure this only runs once per click
+            }
+
+            function scrambleNewNumberPositions() {
+                numberPositions.length = 0; // Clear previous positions
+                for (let i = 0; i < numberCount; i++) {
+                    let x, y;
+                    do {
+                        x = Math.random() * (CANVAS_WIDTH - numberSpacing);
+                        y = Math.random() * (CANVAS_HEIGHT - numberSpacing);
+                    } while (numberPositions.some(pos => Math.abs(pos.x - x) < numberSpacing && Math.abs(pos.y - y) < numberSpacing));
+                    numberPositions.push({ x: x + numberSpacing / 2, y: y + numberSpacing / 2 });
+                }
+                console.log("New positions:", numberPositions);
+            }
+
+            function displayNumbers(withBlock = false) {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+                for (let i = 0; i < numberCount; i++) {
+                    // Pop off one of the numbers
+                    ctx.fillStyle = 'black';
+                    ctx.fillText(i + 1, numberPositions[i].x, numberPositions[i].y);
+                    // On click or tap, remove the number.
+                    if (withBlock) {
+                        console.log("Displaying number with block effect:", i + 1);
+                        setTimeout(() => {
+                            // Add a black square over the number to obscure its value
+                            ctx.fillStyle = 'black';
+                            ctx.fillRect(numberPositions[i].x - numberSize / 2, numberPositions[i].y - numberSize / 2, numberSize, numberSize);
+                        }, timeout = 1000); // Optional delay for visual effect
+                    }
+                }
+            }
+
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            scrambleNewNumberPositions();
+            displayNumbers();
+
+            canvas.addEventListener('click', function (event) {
+                if (isInFailureMode) {
+                    console.log("Captcha is in failure mode. Click to retry.");
+                    scrambleNewNumberPositions();
+                    displayNumbers(hasSucceededOnce);
+                    isInFailureMode = false; // Reset failure mode
+                    return; // Exit if the captcha is in failure mode
+                }
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                // Check if the click is within the bounds of the number
+                for (let i = 0; i < numberPositions.length; i++) {
+                    // Check if the click is within the bounds of the number
+                    if (Math.abs(x - numberPositions[i].x) < numberSize && Math.abs(y - numberPositions[i].y) < numberSize) {
+                        console.log("Clicked on number:", i);
+                        // If its a number we've already clicked, ignore it.
+                        if (i <= lastClickedNumber) {
+                            console.log("Number already clicked:", i + 1);
+                            continue;
+                        }
+                        // If lastClickedNumber is i-1, we're good.
+                        if (i === lastClickedNumber + 1) {
+                            console.log("Correct number clicked:", i + 1);
+                        } else {
+                            console.log("Incorrect number clicked. Expected:", lastClickedNumber + 1, "but got:", i + 1);
+                            // Reset the captcha by scrambling new positions
+                            captchaFailure();
+                            return; // Exit if the wrong number is clicked
+                        }
+
+                        // Remove the number from the canvas
+                        ctx.fillStyle = 'white';
+                        ctx.fillRect(numberPositions[i].x - numberSize / 2, numberPositions[i].y - numberSize / 2, numberSize, numberSize);
+                        // Remove the position from the array
+                        numberPositions.splice(i, 1);
+                        // If all numbers are clicked, call captchaSuccess
+                        if (numberPositions.length === 0) {
+                            if (hasSucceededOnce) {
+                                captchaSuccess();
+                            } else {
+                                hasSucceededOnce = true; // Allow success only once
+                                scrambleNewNumberPositions();
+                                displayNumbers(true); // Show numbers with block effect
+                            }
+                        }
+                    }
+                }
+            });
+
+        })(window, document);
+    </script>
 </body>
+
 </html>
